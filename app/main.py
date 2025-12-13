@@ -726,6 +726,241 @@ class InterfacePanelResponse(BaseModel):
     meta: InterfacePanelMeta
     data: InterfacePanelData
 
+
+class DoorCreateRequest(BaseModel):
+    location_uuid: str
+    name: str
+
+
+@app.post(
+    "/api/v1/customers/{customer_id}/sequr/createDoor",
+    name="create door",
+)
+async def create_door(
+    customer_id: int = Path(..., ge=1),
+    customer_uuid: str = Query(..., min_length=1),
+    payload: DoorCreateRequest = Body(...),
+    db: Session = Depends(get_db),
+):
+    customer = crud.get_customer(db, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    token = customer.secret_hash
+    if not token:
+        raise HTTPException(status_code=400, detail="No token available for this customer")
+
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    url = f"https://mercury-ac-api.sequr.io/v1/customer/{customer_uuid}/door"
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            upstream = await client.post(url, headers=headers, json=payload.dict())
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream request failed: {e}") from e
+    # Forward upstream response (success or error) to the caller
+    return Response(
+        content=upstream.content,
+        media_type=upstream.headers.get("content-type", "application/json"),
+        status_code=upstream.status_code,
+    )
+
+
+@app.get(
+    "/api/v1/customers/{customer_id}/sequr/reader-port",
+    name="get reader port",
+)
+async def get_reader_port(
+    customer_id: int = Path(..., ge=1),
+    customer_uuid: str = Query(..., min_length=1),
+    controller_uuid: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+):
+    customer = crud.get_customer(db, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    token = customer.secret_hash
+    if not token:
+        raise HTTPException(status_code=400, detail="No token available for this customer")
+
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json",
+    }
+
+    url = (
+        f"https://mercury-ac-api.sequr.io/v1/customer/{customer_uuid}/reader_port"
+        f"?controller_uuid={controller_uuid}"
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            upstream = await client.get(url, headers=headers)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream request failed: {e}") from e
+    # Forward upstream response (success or error) to the caller
+    return Response(
+        content=upstream.content,
+        media_type=upstream.headers.get("content-type", "application/json"),
+        status_code=upstream.status_code,
+    )
+
+
+@app.get(
+    "/api/v1/customers/{customer_id}/sequr/output-point",
+    name="output point",
+)
+async def get_output_point(
+    customer_id: int = Path(..., ge=1),
+    customer_uuid: str = Query(..., min_length=1),
+    controller_uuid: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+):
+    customer = crud.get_customer(db, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    token = customer.secret_hash
+    if not token:
+        raise HTTPException(status_code=400, detail="No token available for this customer")
+
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json",
+    }
+
+    url = (
+        f"https://mercury-ac-api.sequr.io/v1/customer/{customer_uuid}/output_point"
+        f"?controller_uuid={controller_uuid}"
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            upstream = await client.get(url, headers=headers)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream request failed: {e}") from e
+    return Response(
+        content=upstream.content,
+        media_type=upstream.headers.get("content-type", "application/json"),
+        status_code=upstream.status_code,
+    )
+
+
+@app.get(
+    "/api/v1/customers/{customer_id}/sequr/input-point",
+    name="input point",
+)
+async def get_input_point(
+    customer_id: int = Path(..., ge=1),
+    customer_uuid: str = Query(..., min_length=1),
+    controller_uuid: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+):
+    customer = crud.get_customer(db, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    token = customer.secret_hash
+    if not token:
+        raise HTTPException(status_code=400, detail="No token available for this customer")
+
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json",
+    }
+
+    url = (
+        f"https://mercury-ac-api.sequr.io/v1/customer/{customer_uuid}/input_point"
+        f"?controller_uuid={controller_uuid}"
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            upstream = await client.get(url, headers=headers)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream request failed: {e}") from e
+    return Response(
+        content=upstream.content,
+        media_type=upstream.headers.get("content-type", "application/json"),
+        status_code=upstream.status_code,
+    )
+
+
+class SaveDoorRequest(BaseModel):
+    location_uuid: str
+    controller_uuid: str
+    reader_port_uuid: str
+    door_strike_output_point_uuid: str | None = None
+    door_position_input_point_uuid: str | None = None
+    rex1_input_point_uuid: str | None = None
+    rex2_input_point_uuid: str | None = None
+    interface_panel_uuid: str
+    reader_address: str | None = None
+    osdp_secure: bool = False
+    reader_port_baud_rate: int = 9600
+
+
+@app.post(
+    "/api/v1/customers/{customer_id}/sequr/save-door",
+    name="save door hardware",
+)
+async def save_door(
+    customer_id: int = Path(..., ge=1),
+    door_uuid: str = Query(..., min_length=1),
+    payload: SaveDoorRequest = Body(...),
+    db: Session = Depends(get_db),
+):
+    customer = crud.get_customer(db, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    token = customer.secret_hash
+    if not token:
+        raise HTTPException(status_code=400, detail="No token available for this customer")
+
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    url = f"https://mercury-ac-api.sequr.io/v1/door/{door_uuid}/hardware"
+
+    body = {
+        "location_uuid": payload.location_uuid,
+        "manufacturer": "MERCURY",
+        "reader_model": "SIGNO_READER_20",
+        "controller_uuid": payload.controller_uuid,
+        "reader_access_type": "ACR_A_SINGLE",
+        "reader_port_uuid": payload.reader_port_uuid,
+        "reader_address": payload.reader_address,
+        "door_strike_output_point_uuid": payload.door_strike_output_point_uuid,
+        "door_position_input_point_uuid": payload.door_position_input_point_uuid,
+        "rex1_input_point_uuid": payload.rex1_input_point_uuid,
+        "rex2_input_point_uuid": payload.rex2_input_point_uuid,
+        "osdp_secure": payload.osdp_secure,
+        "interface_panel_uuid": payload.interface_panel_uuid,
+        "reader_port_led_drive_mode": "OSDP",
+        "reader_port_baud_rate": payload.reader_port_baud_rate,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            upstream = await client.put(url, headers=headers, json=body)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream request failed: {e}") from e
+    return Response(
+        content=upstream.content,
+        media_type=upstream.headers.get("content-type", "application/json"),
+        status_code=upstream.status_code,
+    )
+
 @app.post(
     "/api/v1/customers/{customer_id}/sequr/{controller_uuid}/interface-panel",
     response_model=InterfacePanelResponse,
