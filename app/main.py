@@ -727,6 +727,54 @@ class InterfacePanelResponse(BaseModel):
     data: InterfacePanelData
 
 
+@app.get(
+    "/api/v1/customers/{customer_id}/sequr/interfaces",
+    name="get interface panels",
+)
+async def get_interface_panels(
+    customer_id: int = Path(..., ge=1),
+    customer_uuid: str = Query(..., min_length=1),
+    controller_uuid: str = Query(..., min_length=1),
+    order: str = Query("ASC"),
+    order_by: str = Query("address"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    customer = crud.get_customer(db, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    token = customer.secret_hash
+    if not token:
+        raise HTTPException(status_code=400, detail="No token available for this customer")
+
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json",
+    }
+
+    url = f"https://mercury-ac-api.sequr.io/v1/customer/{customer_uuid}/interface_panel"
+    params = {
+        "order": order,
+        "order_by": order_by,
+        "page": page,
+        "page_size": page_size,
+        "controller_uuid": controller_uuid,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            upstream = await client.get(url, headers=headers, params=params)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream request failed: {e}") from e
+    return Response(
+        content=upstream.content,
+        media_type=upstream.headers.get("content-type", "application/json"),
+        status_code=upstream.status_code,
+    )
+
+
 class DoorCreateRequest(BaseModel):
     location_uuid: str
     name: str
