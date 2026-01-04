@@ -21,12 +21,15 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import Base, engine, get_db
 from app import crud
+import json
 from app.schemas import (
     UserCreate,
     UserLogin,
     UserPublic,
     CustomerCreate,
     CustomerPublic,
+    DraftSave,
+    DraftPublic,
 )
 from app.security import verify_password
 from fastapi import Body
@@ -354,6 +357,79 @@ def delete_customer_api(
     if not ok:
         raise HTTPException(status_code=404, detail="Customer not found")
 
+    return Response(status_code=204)
+
+# --------------------------------------------------------------------------------------
+# Drafts (Access Control Grid Drafts)
+# --------------------------------------------------------------------------------------
+
+def _draft_to_public(obj) -> DraftPublic:
+    try:
+        rows = json.loads(obj.grid_json or "[]")
+    except Exception:
+        rows = []
+    return DraftPublic(
+        id=obj.id,
+        user_id=obj.user_id,
+        customer_id=obj.customer_id,
+        location_uuid=obj.location_uuid,
+        controllers=obj.controllers,
+        downstreams=obj.downstreams,
+        grid_rows=rows,
+    )
+
+
+@app.get("/api/v1/customers/{customer_id}/draft", response_model=DraftPublic | None)
+def get_draft_api(
+    customer_id: int,
+    location_uuid: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current=Depends(get_current_user),
+):
+    draft = crud.get_draft(
+        db,
+        user_id=current["id"],
+        customer_id=customer_id,
+        location_uuid=location_uuid,
+    )
+    if not draft:
+        return None
+    return _draft_to_public(draft)
+
+
+@app.put("/api/v1/customers/{customer_id}/draft", response_model=DraftPublic)
+def save_draft_api(
+    customer_id: int,
+    payload: DraftSave,
+    location_uuid: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current=Depends(get_current_user),
+):
+    draft = crud.upsert_draft(
+        db,
+        user_id=current["id"],
+        customer_id=customer_id,
+        location_uuid=location_uuid,
+        controllers=payload.controllers,
+        downstreams=payload.downstreams,
+        grid_rows=payload.grid_rows,
+    )
+    return _draft_to_public(draft)
+
+
+@app.delete("/api/v1/customers/{customer_id}/draft", status_code=204)
+def delete_draft_api(
+    customer_id: int,
+    location_uuid: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current=Depends(get_current_user),
+):
+    crud.delete_draft(
+        db,
+        user_id=current["id"],
+        customer_id=customer_id,
+        location_uuid=location_uuid,
+    )
     return Response(status_code=204)
 
 # --------------------------------------------------------------------------------------

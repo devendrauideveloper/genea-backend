@@ -1,8 +1,9 @@
 # app/crud.py
 from sqlalchemy.orm import Session  # type: ignore
+import json
 from sqlalchemy import select, func  # type: ignore
 from sqlalchemy.exc import IntegrityError  # type: ignore
-from app.models import User, Customer
+from app.models import User, Customer, Draft
 from app.security import hash_password  # still used for *users* (not customers)
 
 
@@ -156,3 +157,75 @@ def get_customer_token(db: Session, customer_id: int) -> str | None:
     if not obj:
         return None
     return obj.secret_hash
+
+# -------------------
+# Drafts
+# -------------------
+
+def get_draft(
+    db: Session,
+    *,
+    user_id: int,
+    customer_id: int,
+    location_uuid: str,
+) -> Draft | None:
+    stmt = select(Draft).where(
+        Draft.user_id == user_id,
+        Draft.customer_id == customer_id,
+        Draft.location_uuid == location_uuid,
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+def upsert_draft(
+    db: Session,
+    *,
+    user_id: int,
+    customer_id: int,
+    location_uuid: str,
+    controllers: int,
+    downstreams: int,
+    grid_rows: list[dict],
+) -> Draft:
+    obj = get_draft(
+        db,
+        user_id=user_id,
+        customer_id=customer_id,
+        location_uuid=location_uuid,
+    )
+    grid_json = json.dumps(grid_rows)
+    if obj:
+        obj.controllers = controllers
+        obj.downstreams = downstreams
+        obj.grid_json = grid_json
+    else:
+        obj = Draft(
+            user_id=user_id,
+            customer_id=customer_id,
+            location_uuid=location_uuid,
+            controllers=controllers,
+            downstreams=downstreams,
+            grid_json=grid_json,
+        )
+        db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+def delete_draft(
+    db: Session,
+    *,
+    user_id: int,
+    customer_id: int,
+    location_uuid: str,
+) -> bool:
+    obj = get_draft(
+        db,
+        user_id=user_id,
+        customer_id=customer_id,
+        location_uuid=location_uuid,
+    )
+    if not obj:
+        return False
+    db.delete(obj)
+    db.commit()
+    return True

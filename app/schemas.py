@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator # type: ignore
-from typing import Optional, Literal
+from typing import Optional, Literal, Any
 
 class UserBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -55,3 +55,20 @@ class CustomerPublic(BaseModel):
     auth_method: str
     username: Optional[str] = None
     customer_uuid: Optional[str] = None
+
+
+class DraftBase(BaseModel):
+    controllers: int = Field(ge=0)
+    downstreams: int = Field(ge=0)
+    grid_rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DraftSave(DraftBase):
+    pass
+
+
+class DraftPublic(DraftBase):
+    id: int
+    customer_id: int
+    location_uuid: str
+    user_id: int

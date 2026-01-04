@@ -1,6 +1,6 @@
 # app/models.py
 from sqlalchemy.orm import Mapped, mapped_column  # type: ignore
-from sqlalchemy import String, Integer, DateTime, func, UniqueConstraint, ForeignKey  # type: ignore
+from sqlalchemy import String, Integer, DateTime, Text, func, UniqueConstraint, ForeignKey  # type: ignore
 from app.database import Base
 
 class User(Base):
@@ -44,6 +44,28 @@ class Customer(Base):
 
     # optional (unused right now); keep nullable so ORM can select it without errors
     token_ciphertext: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class Draft(Base):
+    __tablename__ = "drafts"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "customer_id",
+            "location_uuid",
+            name="uq_drafts_user_customer_location",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
+    location_uuid: Mapped[str] = mapped_column(String(255), nullable=False)
+    controllers: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    downstreams: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    grid_json: Mapped[str] = mapped_column(Text, nullable=False)
 
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
